@@ -1,7 +1,7 @@
 %% Two-species competition ODE system – publication-quality plots
 %
-%   dN1/dt = N1*(1 - N1 - 2*N2) + gamma1
-%   dN2/dt = N2*(1 - 2*N1 - N2) + gamma2
+%   dN1/dt = N1*(1 - N1 - c1*N2) + gamma1
+%   dN2/dt = N2*(1 - c2*N1 - N2) + gamma2
 %
 %  Figures produced:
 %    (1) Time courses for a single initial condition
@@ -12,13 +12,15 @@
 %% ── Parameters ──────────────────────────────────────────────────────────
 gamma1 = 0.1;
 gamma2 = 0.1;
+c1     = 2;     % competition coefficient: effect of N2 on N1
+c2     = 2;     % competition coefficient: effect of N1 on N2
 
 tspan = [0 50];
 
 %% ── ODE right-hand side ─────────────────────────────────────────────────
 odefun = @(t, N) [ ...
-    N(1).*(1 - N(1) - 2.*N(2)) + gamma1; ...
-    N(2).*(1 - 2.*N(1) - N(2)) + gamma2 ];
+    N(1).*(1 - N(1) - c1.*N(2)) + gamma1; ...
+    N(2).*(1 - c2.*N(1) - N(2)) + gamma2 ];
 
 odeOpts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
 
@@ -29,11 +31,11 @@ FN   = 'Helvetica';   % axis font  ('Times New Roman' for serif)
 blue = [0.13 0.47 0.71];
 
 %% ── Fixed-point analysis ─────────────────────────────────────────────────
-F = @(N) [ N(1).*(1 - N(1) - 2.*N(2)) + gamma1; ...
-           N(2).*(1 - 2.*N(1) - N(2)) + gamma2 ];
+F = @(N) [ N(1).*(1 - N(1) - c1.*N(2)) + gamma1; ...
+           N(2).*(1 - c2.*N(1) - N(2)) + gamma2 ];
 
-J = @(N) [ 1 - 2*N(1) - 2*N(2),   -2*N(1); ...
-           -2*N(2),                 1 - 2*N(1) - 2*N(2) ];
+J = @(N) [ 1 - 2*N(1) - c1*N(2),   -c1*N(1); ...
+           -c2*N(2),                 1 - c2*N(1) - 2*N(2) ];
 
 nSeed    = 12;
 sv       = linspace(0, 1.2, nSeed);
@@ -106,8 +108,8 @@ nGrid  = 22;
     linspace(N1_lim(1), N1_lim(2), nGrid), ...
     linspace(N2_lim(1), N2_lim(2), nGrid));
 
-dN1 = N1g.*(1 - N1g - 2.*N2g) + gamma1;
-dN2 = N2g.*(1 - 2.*N1g - N2g) + gamma2;
+dN1 = N1g.*(1 - N1g - c1.*N2g) + gamma1;
+dN2 = N2g.*(1 - c2.*N1g - N2g) + gamma2;
 mag = sqrt(dN1.^2 + dN2.^2);
 mag(mag == 0) = 1;
 
