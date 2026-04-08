@@ -1,190 +1,160 @@
-%% Double-well potential: V(x) and gradient-descent trajectories
+%% Double-well potential: 2D surface and gradient-descent trajectories
 %
-%   Potential extracted from MSS_figs.mlx (double Gaussian, mu = 0.5):
+%   Potential extracted from MSS_figs.mlx (double Gaussian):
 %
-%       V(x) = -d_L * exp(-(x - x_L)^2 / (2*sig^2))
-%             - d_R * exp(-(x - x_R)^2 / (2*sig^2))
-%             + c * x^2
+%       V(x,μ) = -(1-μ) · exp(-(x-x_L)²/(2σ²))
+%               -    μ  · exp(-(x-x_R)²/(2σ²))
+%               +  c · x²
 %
-%   ODE (gradient descent on V):
-%       dx/dt = -dV/dx
+%   where x  = ecological state   (x ∈ [-2, 2])
+%         μ  = bifurcation param  (μ ∈ [ 0, 1])
 %
-%   Equilibria: zeros of dV/dx, classified by sign of d²V/dx²
-%     • Stable   (local min, d²V/dx² > 0) – solid red   filled circle
-%     • Unstable (local max, d²V/dx² < 0) – solid black filled circle
+%   ODE system (gradient descent on V):
+%       dx/dt = -∂V/∂x
+%       dμ/dt = -∂V/∂μ
 %
-%   Figures produced:
-%     Left  panel – V(x) with equilibria marked on the curve
-%     Right panel – x(t) trajectories from 12 initial conditions,
-%                   coloured by basin of attraction
+%   Integration terminates when μ reaches 0 or 1 (ODE event function).
+%
+%   Figure:
+%     3D surface  V(x,μ)  with colour-coded gradient-descent trajectories
+%     overlaid — green for trajectories from x₀ > 0 (right basin),
+%     brown for x₀ < 0 (left basin).
 %
 %   Saves: plots/double_well_potential.pdf
 
 %% ── Parameters ──────────────────────────────────────────────────────────
 
-x_L  = -1.0;           % left  Gaussian centre
-x_R  =  1.0;           % right Gaussian centre
-sig  =  0.55;          % Gaussian width
-s2   =  sig^2;         % sig^2 = 0.3025 — appears in all derivative formulas
-d_L  =  0.5;           % left  well depth  (mu = 0.5 => d_L = 1 - mu)
-d_R  =  0.5;           % right well depth  (mu = 0.5 => d_R = mu)
-c    =  0.18;          % quadratic confining coefficient
+x_L = -1.0;          % left  Gaussian centre
+x_R =  1.0;          % right Gaussian centre
+sig =  0.55;         % Gaussian width
+s2  =  sig^2;        % s² = 0.3025 — appears in all derivative formulas
+c   =  0.18;         % quadratic confining coefficient
 
-tspan = [0, 12];       % integration window
+x_vec  = linspace(-2, 2, 300);    % ecological-state grid
+mu_vec = linspace( 0, 1, 300);    % bifurcation-parameter grid
 
-%% ── Potential and its derivatives (anonymous functions) ─────────────────
+tspan = [0, 8];      % integration window (event function caps μ ∈ [0,1])
 
-% Gaussian kernel factors
-eL = @(x) exp(-(x - x_L).^2 ./ (2*s2));
-eR = @(x) exp(-(x - x_R).^2 ./ (2*s2));
+%% ── Potential and partial derivatives (anonymous functions) ──────────────
 
-% Potential  V(x)
-V   = @(x)  -d_L.*eL(x) - d_R.*eR(x) + c.*x.^2;
+% Gaussian kernel factors (functions of x only — μ enters via depth coefficients)
+eL = @(x, ~)   exp(-(x - x_L).^2 ./ (2*s2));
+eR = @(x, ~)   exp(-(x - x_R).^2 ./ (2*s2));
 
-% First derivative  dV/dx  (chain rule on each Gaussian + quadratic term)
-dV  = @(x)  (d_L/s2).*(x - x_L).*eL(x) ...
-           + (d_R/s2).*(x - x_R).*eR(x) ...
-           + 2*c.*x;
+% Depth coefficients
+dL = @(mu)     1 - mu;      % left  well depth
+dR = @(mu)     mu;          % right well depth
 
-% Second derivative  d²V/dx²  (product rule: d/dx[(x-xi)*exp(...)])
-d2V = @(x)  (d_L/s2).*(1 - (x - x_L).^2./s2).*eL(x) ...
-           + (d_R/s2).*(1 - (x - x_R).^2./s2).*eR(x) ...
-           + 2*c;
+% Potential  V(x, μ)
+V  = @(x, mu)  -dL(mu).*eL(x,mu) - dR(mu).*eR(x,mu) + c.*x.^2;
 
-% ODE right-hand side: gradient descent
-odefun = @(t, x) -dV(x);
+% ∂V/∂x  (chain rule on each Gaussian + quadratic)
+dVdx = @(x, mu)  (dL(mu)./s2).*(x - x_L).*eL(x,mu) ...
+                + (dR(mu)./s2).*(x - x_R).*eR(x,mu) ...
+                + 2*c.*x;
 
-%% ── ODE solver options ──────────────────────────────────────────────────
+% ∂V/∂μ  = d/dμ[-(1-μ)·eL - μ·eR] = eL - eR
+dVdmu = @(x, mu)  eL(x,mu) - eR(x,mu);
 
-odeOpts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+% 2D ODE: gradient descent  [dx/dt; dμ/dt] = -∇V
+odefun = @(t, u) [ -dVdx(u(1), u(2)); ...
+                   -dVdmu(u(1), u(2)) ];
 
-%% ── Equilibrium analysis ────────────────────────────────────────────────
+%% ── ODE solver options ───────────────────────────────────────────────────
 
-solOpts = optimoptions('fsolve', 'Display', 'off', ...
-                       'TolFun', 1e-12, 'TolX', 1e-12);
+% Event function terminates integration when μ reaches 0 or 1
+odeOpts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10, 'Events', @mu_bounds);
 
-% 15 seeds across the domain to catch all roots of dV/dx = 0
-eq_seeds = linspace(-2.2, 2.2, 15);
+%% ── Surface mesh ─────────────────────────────────────────────────────────
 
-eq_pts  = [];    % x* values
-eq_stab = [];    % 1 = stable (local min), 0 = unstable (local max)
+% meshgrid convention matches MSS_figs.mlx Fig 1:
+%   [X_grid, MU_grid] = meshgrid(x_vec, mu_vec)
+%   → surf(MU_grid, X_grid, V_surf): μ on x-axis, x on y-axis
+[X_grid, MU_grid] = meshgrid(x_vec, mu_vec);
+V_surf = V(X_grid, MU_grid);
 
-for k = 1 : numel(eq_seeds)
-    [xstar, fval, flag] = fsolve(dV, eq_seeds(k), solOpts);
-    if flag > 0 && abs(fval) < 1e-8
-        % Reject duplicates (within tolerance 1e-4)
-        if isempty(eq_pts) || min(abs(eq_pts - xstar)) > 1e-4
-            eq_pts(end+1)  = xstar;                       %#ok<AGROW>
-            eq_stab(end+1) = double(d2V(xstar) > 0);     %#ok<AGROW>
-        end
-    end
-end
+%% ── Trajectories ─────────────────────────────────────────────────────────
 
-% Sort left to right
-[eq_pts, ord] = sort(eq_pts);
-eq_stab       = eq_stab(ord);
-
-idx_s = eq_stab == 1;   % stable   mask
-idx_u = eq_stab == 0;   % unstable mask
-
-fprintf('\n── Equilibria ──────────────────────────────────────────\n');
-for k = 1 : numel(eq_pts)
-    if eq_stab(k); tag = 'stable (local min)'; else; tag = 'unstable (local max)'; end
-    fprintf('  x* = %+.6f   V(x*) = %+.6f   [%s]\n', ...
-            eq_pts(k), V(eq_pts(k)), tag);
-end
-fprintf('────────────────────────────────────────────────────────\n\n');
-
-%% ── Trajectories ────────────────────────────────────────────────────────
-
-% 12 ICs spanning [-2.2, 2.2] — 6 per basin (linspace with even N avoids x0=0)
-IC_vals = linspace(-2.2, 2.2, 12);
+% 4 × 4 grid of initial conditions (x₀, μ₀) in the domain interior
+x0_vals  = linspace(-1.5, 1.5, 4);
+mu0_vals = linspace(0.15, 0.85, 4);
 
 % Basin colours (matching MSS_figs.mlx palette)
-col_right = [0.5059, 0.6078, 0.4039];   % green  — right well (x0 >= 0)
-col_left  = [0.7137, 0.6353, 0.4118];   % brown  — left  well (x0 <  0)
+col_right = [0.5059, 0.6078, 0.4039];   % green  — right basin (x₀ ≥ 0)
+col_left  = [0.7137, 0.6353, 0.4118];   % brown  — left  basin (x₀ <  0)
 
-traj_t   = cell(numel(IC_vals), 1);
-traj_x   = cell(numel(IC_vals), 1);
-traj_col = zeros(numel(IC_vals), 3);
+traj_all = {};   % cell array of trajectory structs
 
-for k = 1 : numel(IC_vals)
-    [tt, xx]   = ode45(odefun, tspan, IC_vals(k), odeOpts);
-    traj_t{k}  = tt;
-    traj_x{k}  = xx;
-    if IC_vals(k) >= 0
-        traj_col(k,:) = col_right;
-    else
-        traj_col(k,:) = col_left;
+for ix = 1 : numel(x0_vals)
+    for im = 1 : numel(mu0_vals)
+        u0 = [x0_vals(ix); mu0_vals(im)];
+        [tt, uu] = ode45(odefun, tspan, u0, odeOpts);
+
+        tr.t   = tt;
+        tr.x   = uu(:, 1);
+        tr.mu  = uu(:, 2);
+        tr.V   = V(uu(:,1), uu(:,2));
+        if x0_vals(ix) >= 0
+            tr.col = col_right;
+        else
+            tr.col = col_left;
+        end
+        traj_all{end+1} = tr;             %#ok<AGROW>
     end
 end
 
 %% ── Shared publication style ─────────────────────────────────────────────
 
-FS      = 22;                    % base font size (pt)
-LW      = 2.0;                   % trajectory line width
-FN      = 'Helvetica';           % axis font
-blue    = [0.13 0.47 0.71];      % potential curve colour
-red_col = [0.85 0.07 0.07];      % stable equilibrium marker
-blk_col = [0    0    0   ];      % unstable equilibrium marker
-MS      = 10;                    % marker size (pt)
+FS  = 22;              % base font size (pt)
+LW  = 2.0;             % trajectory line width
+FN  = 'Helvetica';     % axis font
 
-%% ── Figure ──────────────────────────────────────────────────────────────
+%% ── Figure ───────────────────────────────────────────────────────────────
 
-fig      = figure('Units', 'centimeters', 'Position', [3 3 26 10], 'Color', 'w');
-x_range  = linspace(-2.2, 2.2, 500);
+fig = figure('Units', 'centimeters', 'Position', [3 3 16 13], 'Color', 'w');
+ax  = axes('Parent', fig);
 
-% ─── Left panel: V(x) ────────────────────────────────────────────────────
-ax1 = subplot(1, 2, 1);
-
-plot(x_range, V(x_range), '-', 'Color', blue, 'LineWidth', LW);
+% ─ 3D potential surface (style from MSS_figs.mlx Figure 1) ───────────────
+surf(MU_grid, X_grid, V_surf, 'EdgeColor', 'none', 'FaceAlpha', 0.9);
+shading interp
+colormap(ax, flipud(parula));
 hold on;
 
-% Stable equilibria — solid red filled circles on the curve
-plot(eq_pts(idx_s), V(eq_pts(idx_s)), 'o', ...
-     'Color',           red_col, ...
-     'MarkerFaceColor', red_col, ...
-     'MarkerSize', MS, 'LineWidth', 1.5);
+% ─ Gradient-descent trajectories overlaid on the surface ─────────────────
+lift = 0.05;    % vertical offset so curves sit visibly above the surface
 
-% Unstable equilibria — solid black filled circles on the curve
-plot(eq_pts(idx_u), V(eq_pts(idx_u)), 'o', ...
-     'Color',           blk_col, ...
-     'MarkerFaceColor', blk_col, ...
-     'MarkerSize', MS, 'LineWidth', 1.5);
+for k = 1 : numel(traj_all)
+    tr = traj_all{k};
 
-xlabel('$x$',    'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
-ylabel('$V(x)$', 'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN, ...
-       'Rotation', 0, 'HorizontalAlignment', 'right');
+    % Trajectory curve
+    plot3(tr.mu, tr.x, tr.V + lift, '-', ...
+          'Color', tr.col, 'LineWidth', LW);
 
-xlim([-2.2, 2.2]);
-
-set(ax1, 'FontSize', FS, 'FontName', FN, 'LineWidth', 0.8, ...
-         'TickDir', 'out', 'TickLength', [0.015 0.015], 'Box', 'off');
-
-% ─── Right panel: x(t) trajectories ──────────────────────────────────────
-ax2 = subplot(1, 2, 2);
-hold on;
-
-for k = 1 : numel(IC_vals)
-    plot(traj_t{k}, traj_x{k}, '-', ...
-         'Color', traj_col(k,:), 'LineWidth', LW);
+    % Mark initial condition with a small filled circle
+    plot3(tr.mu(1), tr.x(1), tr.V(1) + lift, 'o', ...
+          'Color',           tr.col, ...
+          'MarkerFaceColor', tr.col, ...
+          'MarkerSize', 5, 'LineWidth', 1.0);
 end
 
-% Dashed horizontal lines at stable equilibrium positions
-x_stab = eq_pts(idx_s);
-for k = 1 : numel(x_stab)
-    yline(x_stab(k), '--', 'Color', red_col, 'LineWidth', 1.0);
-end
+% ─ Axes labels (matching MSS_figs.mlx Figure 1) ──────────────────────────
+xlabel('Bifurcation parameter $\mu$', ...
+       'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
+ylabel('Ecological state $x$', ...
+       'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
+zlabel('Potential $V$', ...
+       'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
 
-xlabel('Time, $t$', 'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
-ylabel('$x(t)$',    'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN, ...
-       'Rotation', 0, 'HorizontalAlignment', 'right');
+% ─ View and axis formatting ───────────────────────────────────────────────
+view([-40, 24]);
+xlim([0,  1]);
+ylim([-2, 2]);
 
-xlim([0,   12  ]);
-ylim([-2.4, 2.4]);
-
-set(ax2, 'FontSize', FS, 'FontName', FN, 'LineWidth', 0.8, ...
-         'TickDir', 'out', 'TickLength', [0.015 0.015], 'Box', 'off');
+ax.Box       = 'on';
+ax.FontSize  = FS;
+ax.FontName  = FN;
+ax.LineWidth = 0.8;
+ax.GridAlpha = 0.2;
 
 %% ── Save figure ──────────────────────────────────────────────────────────
 
@@ -193,3 +163,12 @@ if ~exist('plots', 'dir')
 end
 
 exportgraphics(fig, 'plots/double_well_potential.pdf', 'ContentType', 'vector');
+
+%% ── Local functions ──────────────────────────────────────────────────────
+
+function [val, isterm, dir] = mu_bounds(~, u)
+%MU_BOUNDS  ODE event: terminate when μ reaches 0 or 1.
+    val    = [u(2);   1 - u(2)];   % zero when μ = 0 or μ = 1
+    isterm = [1;      1       ];   % stop integration at both events
+    dir    = [-1;     1       ];   % μ approaching 0 from above, 1 from below
+end
