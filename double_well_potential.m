@@ -1,154 +1,179 @@
-%% Double-well potential: 2D surface and gradient-descent trajectories
+%% 2D bistable ecosystem potential: surface and gradient-descent trajectories
 %
-%   Potential extracted from MSS_figs.mlx (double Gaussian):
+%   Phenomenological double-well potential (cusp catastrophe normal form):
 %
-%       V(x,μ) = -(1-μ) · exp(-(x-x_L)²/(2σ²))
-%               -    μ  · exp(-(x-x_R)²/(2σ²))
-%               +  c · x²
+%       V(x, y) = (x² - 1)² + y²
 %
-%   where x  = ecological state   (x ∈ [-2, 2])
-%         μ  = bifurcation param  (μ ∈ [ 0, 1])
+%   This is the normal form of the fold/cusp catastrophe widely used in
+%   ecology to model regime shifts and bistability (Zeeman 1976, May 1977,
+%   Scheffer et al. 2001).  In the parametric form
+%
+%       V(x, y; b) = x⁴/4 - b·x²/2 + y²
+%
+%   the bifurcation parameter b controls the number of stable states:
+%     b > 0  (here b = 2)  →  two stable states at x* = ±√b  (bistable)
+%     b = 0                →  fold bifurcation (single degenerate state)
+%     b < 0                →  one stable state at x* = 0 (monostable)
+%
+%   x = normalised ecosystem state (e.g. vegetation cover, fish biomass)
+%   y = environmental fluctuation (e.g. soil moisture, turbidity)
+%
+%   Equilibria:
+%     Stable (local minima):  (±1, 0),  V = 0
+%     Unstable (saddle):       (0,  0),  V = 1
 %
 %   ODE system (gradient descent on V):
-%       dx/dt = -∂V/∂x
-%       dμ/dt = -∂V/∂μ
-%
-%   Integration terminates when μ reaches 0 or 1 (ODE event function).
+%       dx/dt = -∂V/∂x = 4x(1 - x²)
+%       dy/dt = -∂V/∂y = -2y
 %
 %   Figure:
-%     3D surface  V(x,μ)  with colour-coded gradient-descent trajectories
-%     overlaid — green for trajectories from x₀ > 0 (right basin),
-%     brown for x₀ < 0 (left basin).
+%     3D surface  V(x, y)  with colour-coded gradient-descent trajectories:
+%     green  = trajectories converging to the right stable state  (x* = +1)
+%     brown  = trajectories converging to the left  stable state  (x* = -1)
+%
+%   References:
+%     Zeeman (1976) Catastrophe theory. Sci. Am. 234, 65-83.
+%     May (1977) Thresholds and breakpoints. Nature 269, 471-477.
+%     Scheffer et al. (2001) Catastrophic shifts. Nature 413, 591-596.
 %
 %   Saves: plots/double_well_potential.pdf
 
 %% ── Parameters ──────────────────────────────────────────────────────────
 
-x_L = -1.0;          % left  Gaussian centre
-x_R =  1.0;          % right Gaussian centre
-sig =  0.55;         % Gaussian width
-s2  =  sig^2;        % s² = 0.3025 — appears in all derivative formulas
-c   =  0.18;         % quadratic confining coefficient
+b = 2;          % bifurcation parameter  (bistable for b > 0)
 
-x_vec  = linspace(-2, 2, 300);    % ecological-state grid
-mu_vec = linspace( 0, 1, 300);    % bifurcation-parameter grid
+x_vec = linspace(-2, 2, 300);   % state-variable grid
+y_vec = linspace(-2, 2, 300);   % environmental-variable grid
 
-tspan = [0, 8];      % integration window (event function caps μ ∈ [0,1])
+tspan = [0, 5];                  % integration window
 
 %% ── Potential and partial derivatives (anonymous functions) ──────────────
 
-% Gaussian kernel factors (functions of x only — μ enters via depth coefficients)
-eL = @(x, ~)   exp(-(x - x_L).^2 ./ (2*s2));
-eR = @(x, ~)   exp(-(x - x_R).^2 ./ (2*s2));
+% Potential  V(x, y; b) = x⁴/4 - b·x²/2 + y²  =  (x² - b/2·(x²) + y²)
+% Written in terms of b for easy parameter sweeps:
+V    = @(x, y)   (x.^2 - 1).^2  +  y.^2;          % b = 2 hardwired
 
-% Depth coefficients
-dL = @(mu)     1 - mu;      % left  well depth
-dR = @(mu)     mu;          % right well depth
+% ∂V/∂x = 4x(x² - 1)
+dVdx = @(x, y)   4.*x.*(x.^2 - 1);
 
-% Potential  V(x, μ)
-V  = @(x, mu)  -dL(mu).*eL(x,mu) - dR(mu).*eR(x,mu) + c.*x.^2;
+% ∂V/∂y = 2y
+dVdy = @(x, y)   2.*y;
 
-% ∂V/∂x  (chain rule on each Gaussian + quadratic)
-dVdx = @(x, mu)  (dL(mu)./s2).*(x - x_L).*eL(x,mu) ...
-                + (dR(mu)./s2).*(x - x_R).*eR(x,mu) ...
-                + 2*c.*x;
-
-% ∂V/∂μ  = d/dμ[-(1-μ)·eL - μ·eR] = eL - eR
-dVdmu = @(x, mu)  eL(x,mu) - eR(x,mu);
-
-% 2D ODE: gradient descent  [dx/dt; dμ/dt] = -∇V
+% 2D ODE right-hand side:  [dx/dt; dy/dt] = -∇V
 odefun = @(t, u) [ -dVdx(u(1), u(2)); ...
-                   -dVdmu(u(1), u(2)) ];
+                   -dVdy(u(1), u(2)) ];
 
 %% ── ODE solver options ───────────────────────────────────────────────────
 
-% Event function terminates integration when μ reaches 0 or 1
-odeOpts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10, 'Events', @mu_bounds);
+odeOpts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
 
-%% ── Surface mesh ─────────────────────────────────────────────────────────
+%% ── Equilibria ───────────────────────────────────────────────────────────
+% Analytical: ∇V = 0 → 4x(x²-1) = 0 AND 2y = 0
+%   Stable   (local minima, ∂²V/∂x² > 0): (±1, 0), V = 0
+%   Unstable (saddle,       ∂²V/∂x² < 0): ( 0, 0), V = 1
 
-% meshgrid convention matches MSS_figs.mlx Fig 1:
-%   [X_grid, MU_grid] = meshgrid(x_vec, mu_vec)
-%   → surf(MU_grid, X_grid, V_surf): μ on x-axis, x on y-axis
-[X_grid, MU_grid] = meshgrid(x_vec, mu_vec);
-V_surf = V(X_grid, MU_grid);
+eq_stable   = [ 1, 0;  -1, 0 ];    % [x, y] rows
+eq_unstable = [ 0, 0           ];
+
+fprintf('\n── Equilibria ──────────────────────────────────────────────\n');
+for k = 1 : size(eq_stable, 1)
+    fprintf('  Stable   (x*, y*) = (%+.1f, %+.1f)   V = %.4f\n', ...
+            eq_stable(k,1), eq_stable(k,2), V(eq_stable(k,1), eq_stable(k,2)));
+end
+for k = 1 : size(eq_unstable, 1)
+    fprintf('  Unstable (x*, y*) = (%+.1f, %+.1f)   V = %.4f\n', ...
+            eq_unstable(k,1), eq_unstable(k,2), V(eq_unstable(k,1), eq_unstable(k,2)));
+end
+fprintf('────────────────────────────────────────────────────────────\n\n');
 
 %% ── Trajectories ─────────────────────────────────────────────────────────
 
-% 4 × 4 grid of initial conditions (x₀, μ₀) in the domain interior
-x0_vals  = linspace(-1.5, 1.5, 4);
-mu0_vals = linspace(0.15, 0.85, 4);
+% 6 × 4 grid of ICs — linspace with even counts avoids x0 = 0 exactly
+x0_vals = linspace(-1.8, 1.8, 6);   % 6 values: -1.8 -1.08 -0.36 +0.36 +1.08 +1.8
+y0_vals = linspace(-1.5, 1.5, 4);   % 4 values: -1.5 -0.5 +0.5 +1.5
 
 % Basin colours (matching MSS_figs.mlx palette)
-col_right = [0.5059, 0.6078, 0.4039];   % green  — right basin (x₀ ≥ 0)
-col_left  = [0.7137, 0.6353, 0.4118];   % brown  — left  basin (x₀ <  0)
+col_right = [0.5059, 0.6078, 0.4039];   % green  — right basin (x0 > 0)
+col_left  = [0.7137, 0.6353, 0.4118];   % brown  — left  basin (x0 < 0)
 
-traj_all = {};   % cell array of trajectory structs
+traj_all = {};
 
 for ix = 1 : numel(x0_vals)
-    for im = 1 : numel(mu0_vals)
-        u0 = [x0_vals(ix); mu0_vals(im)];
-        [tt, uu] = ode45(odefun, tspan, u0, odeOpts);
+    for iy = 1 : numel(y0_vals)
+        u0 = [x0_vals(ix); y0_vals(iy)];
+        [~, uu] = ode45(odefun, tspan, u0, odeOpts);
 
-        tr.t   = tt;
         tr.x   = uu(:, 1);
-        tr.mu  = uu(:, 2);
+        tr.y   = uu(:, 2);
         tr.V   = V(uu(:,1), uu(:,2));
         if x0_vals(ix) >= 0
             tr.col = col_right;
         else
             tr.col = col_left;
         end
-        traj_all{end+1} = tr;             %#ok<AGROW>
+        traj_all{end+1} = tr;    %#ok<AGROW>
     end
 end
 
 %% ── Shared publication style ─────────────────────────────────────────────
 
-FS  = 22;              % base font size (pt)
-LW  = 2.0;             % trajectory line width
-FN  = 'Helvetica';     % axis font
+FS  = 22;             % base font size (pt)
+LW  = 2.0;            % trajectory line width
+FN  = 'Helvetica';    % axis font
+
+red_col = [0.85 0.07 0.07];    % stable equilibrium marker
+blk_col = [0    0    0   ];    % unstable equilibrium marker
+MS  = 10;                      % marker size (pt)
 
 %% ── Figure ───────────────────────────────────────────────────────────────
 
 fig = figure('Units', 'centimeters', 'Position', [3 3 16 13], 'Color', 'w');
 ax  = axes('Parent', fig);
 
-% ─ 3D potential surface (style from MSS_figs.mlx Figure 1) ───────────────
-surf(MU_grid, X_grid, V_surf, 'EdgeColor', 'none', 'FaceAlpha', 0.9);
+% ─ 3D potential surface ───────────────────────────────────────────────────
+[X_grid, Y_grid] = meshgrid(x_vec, y_vec);
+V_surf = V(X_grid, Y_grid);
+
+surf(X_grid, Y_grid, V_surf, 'EdgeColor', 'none', 'FaceAlpha', 0.88);
 shading interp
 colormap(ax, flipud(parula));
 hold on;
 
-% ─ Gradient-descent trajectories overlaid on the surface ─────────────────
-lift = 0.05;    % vertical offset so curves sit visibly above the surface
+% ─ Gradient-descent trajectories ─────────────────────────────────────────
+lift = 0.06;   % vertical offset so curves sit visibly above the surface
 
 for k = 1 : numel(traj_all)
     tr = traj_all{k};
-
-    % Trajectory curve
-    plot3(tr.mu, tr.x, tr.V + lift, '-', ...
+    plot3(tr.x, tr.y, tr.V + lift, '-', ...
           'Color', tr.col, 'LineWidth', LW);
-
-    % Mark initial condition with a small filled circle
-    plot3(tr.mu(1), tr.x(1), tr.V(1) + lift, 'o', ...
-          'Color',           tr.col, ...
-          'MarkerFaceColor', tr.col, ...
+    % Mark initial condition
+    plot3(tr.x(1), tr.y(1), tr.V(1) + lift, 'o', ...
+          'Color', tr.col, 'MarkerFaceColor', tr.col, ...
           'MarkerSize', 5, 'LineWidth', 1.0);
 end
 
-% ─ Axes labels (matching MSS_figs.mlx Figure 1) ──────────────────────────
-xlabel('Bifurcation parameter $\mu$', ...
+% ─ Equilibria on the surface ─────────────────────────────────────────────
+% Stable — solid red filled circles at V = 0
+plot3(eq_stable(:,1), eq_stable(:,2), V(eq_stable(:,1), eq_stable(:,2)) + lift, 'o', ...
+      'Color', red_col, 'MarkerFaceColor', red_col, ...
+      'MarkerSize', MS, 'LineWidth', 1.5);
+
+% Unstable — solid black filled circles at V = 1
+plot3(eq_unstable(:,1), eq_unstable(:,2), V(eq_unstable(:,1), eq_unstable(:,2)) + lift, 'o', ...
+      'Color', blk_col, 'MarkerFaceColor', blk_col, ...
+      'MarkerSize', MS, 'LineWidth', 1.5);
+
+% ─ Axes labels and formatting ─────────────────────────────────────────────
+xlabel('Ecosystem state, $x$', ...
        'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
-ylabel('Ecological state $x$', ...
+ylabel('Environmental variable, $y$', ...
        'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
-zlabel('Potential $V$', ...
+zlabel('Potential, $V$', ...
        'Interpreter', 'latex', 'FontSize', FS, 'FontName', FN);
 
-% ─ View and axis formatting ───────────────────────────────────────────────
-view([-40, 24]);
-xlim([0,  1]);
-ylim([-2, 2]);
+view([-40, 25]);
+xlim([-2,  2]);
+ylim([-2,  2]);
 
 ax.Box       = 'on';
 ax.FontSize  = FS;
@@ -163,12 +188,3 @@ if ~exist('plots', 'dir')
 end
 
 exportgraphics(fig, 'plots/double_well_potential.pdf', 'ContentType', 'vector');
-
-%% ── Local functions ──────────────────────────────────────────────────────
-
-function [val, isterm, dir] = mu_bounds(~, u)
-%MU_BOUNDS  ODE event: terminate when μ reaches 0 or 1.
-    val    = [u(2);   1 - u(2)];   % zero when μ = 0 or μ = 1
-    isterm = [1;      1       ];   % stop integration at both events
-    dir    = [-1;     1       ];   % μ approaching 0 from above, 1 from below
-end
