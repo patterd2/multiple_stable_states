@@ -85,27 +85,35 @@ fprintf('───────────────────────�
 
 %% ── Trajectories ─────────────────────────────────────────────────────────
 
-% 6 × 4 grid of ICs — even counts keep x0 = 0 out of the grid
-x0_vals = linspace(-2.4, 2.4, 6);    % six ICs spanning both basins
-y0_vals = linspace(-1.2, 1.2, 4);    % four ICs in y
-
 % Basin colours (matching MSS_figs.mlx palette)
 col_right = [0.5059, 0.6078, 0.4039];   % green  — right basin (x0 > 0)
 col_left  = [0.7137, 0.6353, 0.4118];   % brown  — left  basin (x0 < 0)
 
+% 14 initial conditions as explicit [x0, y0] rows.
+% Symmetric layout: 6 far-field (±2.2, ±1.4) × 2 y-levels,
+% plus 2 near-saddle ICs that hug the separatrix.
+ICs = [ ...
+   -2.2, -1.0;   -2.2,  1.0; ...   % far left,  both y
+   -1.4, -1.0;   -1.4,  1.0; ...   % mid left,  both y
+   -0.6, -1.0;   -0.6,  1.0; ...   % near left, both y
+    0.6, -1.0;    0.6,  1.0; ...   % near right,both y
+    1.4, -1.0;    1.4,  1.0; ...   % mid right, both y
+    2.2, -1.0;    2.2,  1.0; ...   % far right, both y
+   -0.2,  0.0;    0.2,  0.0  ...   % on y=0, near separatrix
+];  % 14 rows total
+
 traj_all = {};
 
-for ix = 1 : numel(x0_vals)
-    for iy = 1 : numel(y0_vals)
-        u0       = [x0_vals(ix); y0_vals(iy)];
-        [~, uu]  = ode45(odefun, tspan, u0, odeOpts);
+for k = 1 : size(ICs, 1)
+    u0      = ICs(k, :).';
+    [~, uu] = ode45(odefun, tspan, u0, odeOpts);
 
-        tr.x   = uu(:, 1);
-        tr.y   = uu(:, 2);
-        tr.V   = V(uu(:,1), uu(:,2));
-        tr.col = col_right * (x0_vals(ix) >= 0) + col_left * (x0_vals(ix) < 0);
-        traj_all{end+1} = tr;    %#ok<AGROW>
-    end
+    tr.x      = uu(:, 1);
+    tr.y      = uu(:, 2);
+    tr.V      = V(uu(:,1), uu(:,2));
+    tr.col    = col_right * (ICs(k,1) >= 0) + col_left * (ICs(k,1) < 0);
+    tr.col_dk = tr.col * 0.60;   % darkened shade for the directional arrow
+    traj_all{end+1} = tr;    %#ok<AGROW>
 end
 
 %% ── Shared publication style ─────────────────────────────────────────────
@@ -133,8 +141,9 @@ colormap(ax, flipud(parula));
 hold on;
 
 % ─ Trajectories with directional arrows ──────────────────────────────────
-lift      = 0.04;    % vertical offset so curves sit above the surface
-arrow_len = 0.28;    % arrow length in data units (uniform across all curves)
+lift      = 0.04;    % z-offset for trajectory lines above surface
+lift_arr  = 0.22;    % z-offset for arrows (higher so tips clear the surface)
+arrow_len = 0.55;    % uniform arrow length in (x,y) data units
 
 for k = 1 : numel(traj_all)
     tr = traj_all{k};
@@ -149,24 +158,25 @@ for k = 1 : numel(traj_all)
           'Color', tr.col, 'MarkerFaceColor', tr.col, ...
           'MarkerSize', 5, 'LineWidth', 1.0);
 
-    % Directional arrow — placed at ~35 % along the trajectory
+    % Directional arrow — placed at ~30 % along the trajectory.
+    % Projected onto the (x,y) plane at a fixed z height so the tip
+    % never dips into the surface regardless of trajectory slope.
     if n < 6; continue; end
-    idx = max(3, round(n * 0.35));
-    i0  = max(1,   idx - 2);
-    i1  = min(n,   idx + 2);
+    idx = max(3, round(n * 0.30));
+    i0  = max(1, idx - 3);
+    i1  = min(n, idx + 3);
 
-    dx_a = tr.x(i1) - tr.x(i0);
-    dy_a = tr.y(i1) - tr.y(i0);
-    dV_a = tr.V(i1) - tr.V(i0);
-    mag  = sqrt(dx_a^2 + dy_a^2 + dV_a^2);
-    if mag < 1e-10; continue; end
+    dx_a  = tr.x(i1) - tr.x(i0);
+    dy_a  = tr.y(i1) - tr.y(i0);
+    mag2d = sqrt(dx_a^2 + dy_a^2);
+    if mag2d < 1e-10; continue; end
 
-    u = dx_a / mag * arrow_len;
-    v = dy_a / mag * arrow_len;
-    w = dV_a / mag * arrow_len;
+    u = dx_a / mag2d * arrow_len;   % normalised to fixed length in (x,y)
+    v = dy_a / mag2d * arrow_len;
+    w = 0;                          % flat: keeps tip above surface
 
-    quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
-            'Color', tr.col, 'LineWidth', LW, 'MaxHeadSize', 2.5);
+    quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift_arr, u, v, w, 0, ...
+            'Color', tr.col_dk, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.45);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
