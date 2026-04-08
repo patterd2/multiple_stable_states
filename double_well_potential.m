@@ -141,9 +141,8 @@ colormap(ax, flipud(parula));
 hold on;
 
 % ─ Trajectories with directional arrows ──────────────────────────────────
-lift      = 0.04;    % z-offset for trajectory lines above surface
-lift_arr  = 0.22;    % z-offset for arrows (higher so tips clear the surface)
-arrow_len = 0.55;    % uniform arrow length in (x,y) data units
+lift      = 0.04;    % z-offset for trajectory lines (and arrows) above surface
+arrow_len = 0.55;    % uniform arrow length in 3D data units
 
 for k = 1 : numel(traj_all)
     tr = traj_all{k};
@@ -158,9 +157,10 @@ for k = 1 : numel(traj_all)
           'Color', tr.col, 'MarkerFaceColor', tr.col, ...
           'MarkerSize', 5, 'LineWidth', 1.0);
 
-    % Directional arrow — placed at ~30 % along the trajectory.
-    % Projected onto the (x,y) plane at a fixed z height so the tip
-    % never dips into the surface regardless of trajectory slope.
+    % Directional arrow — sits on the trajectory at ~30 % along the curve.
+    % Full 3D direction (dx, dy, dV) so the arrow follows the surface slope.
+    % The tip stays above the surface because the trajectory itself runs at
+    % V + lift, so the tip lands at ~V(x_tip, y_tip) + lift.
     if n < 6; continue; end
     idx = max(3, round(n * 0.30));
     i0  = max(1, idx - 3);
@@ -168,15 +168,16 @@ for k = 1 : numel(traj_all)
 
     dx_a  = tr.x(i1) - tr.x(i0);
     dy_a  = tr.y(i1) - tr.y(i0);
-    mag2d = sqrt(dx_a^2 + dy_a^2);
-    if mag2d < 1e-10; continue; end
+    dV_a  = tr.V(i1) - tr.V(i0);
+    mag3d = sqrt(dx_a^2 + dy_a^2 + dV_a^2);
+    if mag3d < 1e-10; continue; end
 
-    u = dx_a / mag2d * arrow_len;   % normalised to fixed length in (x,y)
-    v = dy_a / mag2d * arrow_len;
-    w = 0;                          % flat: keeps tip above surface
+    u = dx_a / mag3d * arrow_len;
+    v = dy_a / mag3d * arrow_len;
+    w = dV_a / mag3d * arrow_len;
 
-    quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift_arr, u, v, w, 0, ...
-            'Color', tr.col_dk, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.45);
+    quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
+            'Color', tr.col_dk, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.55);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
