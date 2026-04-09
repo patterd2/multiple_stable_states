@@ -142,7 +142,7 @@ hold on;
 
 % ─ Trajectories with directional arrows ──────────────────────────────────
 lift      = 0.04;    % z-offset for trajectory lines (and arrows) above surface
-arrow_len = 0.55;    % uniform arrow length in 3D data units
+arrow_len = 0.08;    % very short — shaft invisible, only arrowhead shows
 
 for k = 1 : numel(traj_all)
     tr = traj_all{k};
@@ -162,7 +162,7 @@ for k = 1 : numel(traj_all)
     % The tip stays above the surface because the trajectory itself runs at
     % V + lift, so the tip lands at ~V(x_tip, y_tip) + lift.
     if n < 6; continue; end
-    idx = max(3, round(n * 0.20));
+    idx = max(3, round(n * 0.10));
     i0  = max(1, idx - 3);
     i1  = min(n, idx + 3);
 
@@ -177,7 +177,7 @@ for k = 1 : numel(traj_all)
     w = dV_a / mag3d * arrow_len;
 
     quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
-            'Color', tr.col, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.75);
+            'Color', tr.col, 'LineWidth', LW + 0.5, 'MaxHeadSize', 1.0);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
