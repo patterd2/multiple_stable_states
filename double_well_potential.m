@@ -119,7 +119,7 @@ end
 %% ── Shared publication style ─────────────────────────────────────────────
 
 FS  = 22;             % base font size (pt)
-LW  = 2.0;            % trajectory line width
+LW  = 1.6;            % trajectory line width  (2.0 × 0.8 = 1.6)
 FN  = 'Helvetica';    % axis font
 
 red_col = [0.85 0.07 0.07];   % stable equilibrium marker
@@ -177,7 +177,7 @@ for k = 1 : numel(traj_all)
     w = dV_a / mag3d * arrow_len;
 
     quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
-            'Color', tr.col_dk, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.55);
+            'Color', tr.col, 'LineWidth', LW + 0.4, 'MaxHeadSize', 0.55);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
