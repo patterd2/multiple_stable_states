@@ -113,7 +113,7 @@ for k = 1 : size(ICs, 1)
     tr.V      = V(uu(:,1), uu(:,2));
     tr.col    = col_right * (ICs(k,1) >= 0) + col_left * (ICs(k,1) < 0);
     tr.col_dk = tr.col * 0.60;   % darkened shade for the directional arrow
-    traj_all{end+1} = tr;    %#ok<AGROW>
+    traj_all{end+1} = tr;   
 end
 
 %% ── Shared publication style ─────────────────────────────────────────────
@@ -162,7 +162,7 @@ for k = 1 : numel(traj_all)
     % The tip stays above the surface because the trajectory itself runs at
     % V + lift, so the tip lands at ~V(x_tip, y_tip) + lift.
     if n < 6; continue; end
-    idx = max(3, round(n * 0.30));
+    idx = max(3, round(n * 0.20));
     i0  = max(1, idx - 3);
     i1  = min(n, idx + 3);
 
@@ -177,7 +177,7 @@ for k = 1 : numel(traj_all)
     w = dV_a / mag3d * arrow_len;
 
     quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
-            'Color', tr.col, 'LineWidth', LW + 0.4, 'MaxHeadSize', 0.55);
+            'Color', tr.col, 'LineWidth', LW + 0.5, 'MaxHeadSize', 0.75);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
