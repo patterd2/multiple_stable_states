@@ -155,7 +155,7 @@ for k = 1 : numel(traj_all)
     % IC marker
     plot3(tr.x(1), tr.y(1), tr.V(1) + lift, 'o', ...
           'Color', tr.col, 'MarkerFaceColor', tr.col, ...
-          'MarkerSize', 5, 'LineWidth', 1.0);
+          'MarkerSize', 3, 'LineWidth', 1.0);
 
     % Directional arrow — sits on the trajectory at ~30 % along the curve.
     % Full 3D direction (dx, dy, dV) so the arrow follows the surface slope.
@@ -176,8 +176,8 @@ for k = 1 : numel(traj_all)
     v = dy_a / mag3d * arrow_len;
     w = dV_a / mag3d * arrow_len;
 
-    quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
-            'Color', tr.col, 'LineWidth', LW + 0.5, 'MaxHeadSize', 1.0);
+    %quiver3(tr.x(idx), tr.y(idx), tr.V(idx) + lift, u, v, w, 0, ...
+    %        'Color', tr.col, 'LineWidth', LW + 2.0, 'MaxHeadSize', 3.0);
 end
 
 % ─ Equilibria on the surface ─────────────────────────────────────────────
@@ -216,8 +216,8 @@ ax.GridAlpha = 0.2;
 
 %% ── Save figure ──────────────────────────────────────────────────────────
 
-if ~exist('plots', 'dir')
-    mkdir('plots');
-end
+%if ~exist('plots', 'dir')
+%    mkdir('plots');
+%end
 
-exportgraphics(fig, 'plots/double_well_potential.pdf', 'ContentType', 'vector');
+%exportgraphics(fig, 'plots/double_well_potential.pdf', 'ContentType', 'vector');

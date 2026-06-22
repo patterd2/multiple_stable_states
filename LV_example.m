@@ -12,8 +12,8 @@
 %% ── Parameters ──────────────────────────────────────────────────────────
 gamma1 = 0.1;
 gamma2 = 0.1;
-c1     = 2;     % competition coefficient: effect of N2 on N1
-c2     = 2;     % competition coefficient: effect of N1 on N2
+c1     = 0.5;     % competition coefficient: effect of N2 on N1
+c2     = 0.5;     % competition coefficient: effect of N1 on N2
 
 tspan = [0 50];
 
