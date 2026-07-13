@@ -6,11 +6,15 @@ Code repository accompanying a review paper on multiple stable states in ecologi
 
 ## Overview
 
-This repository provides MATLAB scripts for simulating and visualising a two-species competition model that exhibits multiple stable equilibria. The example demonstrates how bistability arises from competitive exclusion dynamics, and produces publication-quality phase portraits and time-course plots.
+This repository contains MATLAB scripts for producing Figures 2 and 3 from the paper "Towards a unified framework for multiple stable states in ecological systems" published in the Journal of the Royal Society Interface. 
+
+Figure 2: We provide a MATLAB script to visualise a 2D potential function with two stable steady states and one unstable steady state.
+
+Figure 3: We provide MATLAB scripts to simulate and visualise a two-species competition model that exhibits multiple stable equilibria. The example demonstrates how bistability arises from competitive exclusion dynamics, and produces publication-quality phase portraits and time-course plots.
 
 ---
 
-## Model
+## Model for Figure 3
 
 The system is governed by a pair of coupled ODEs:
 
@@ -60,7 +64,7 @@ All adjustable parameters are declared at the top of `LV_example.m`:
 ## Requirements
 
 - MATLAB R2017b or later
-- Optimization Toolbox (for `fsolve`)
+- Optimisation Toolbox (for `fsolve`)
 
 No additional toolboxes are required.
 
